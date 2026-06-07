@@ -14,12 +14,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build release zip
+      - name: Build EventMsg.exe
         shell: pwsh
         run: ./package-release.ps1
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: release/upsmon-toast-notify-*.zip
+          files: release/EventMsg.exe
           generate_release_notes: true

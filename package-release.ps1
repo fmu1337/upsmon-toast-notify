@@ -1,22 +1,11 @@
-# Builds signed EventMsg.exe and packs a release zip for GitHub.
+# Builds EventMsg.exe for GitHub Release (exe only).
 $ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
-& (Join-Path $here 'build.ps1') -Sign
+& (Join-Path $here 'build.ps1')
 
 $releaseDir = Join-Path $here 'release'
 New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
 
-$version = '2.1.0'
-$stage = Join-Path $releaseDir "upsmon-toast-notify-$version"
-if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
-New-Item -ItemType Directory -Force -Path $stage | Out-Null
-
-Copy-Item (Join-Path $here 'EventMsg.exe') $stage -Force
-Copy-Item (Join-Path $here 'UpsmonToastNotify.cer') $stage -Force
-Copy-Item (Join-Path $here 'install.ps1') $stage -Force
-Copy-Item (Join-Path $here 'README.md') $stage -Force
-
-$zip = Join-Path $releaseDir "upsmon-toast-notify-$version.zip"
-if (Test-Path $zip) { Remove-Item $zip -Force }
-Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip -Force
-Write-Host "Release zip -> $zip"
+$version = '3.0.0'
+Copy-Item (Join-Path $here 'EventMsg.exe') (Join-Path $releaseDir 'EventMsg.exe') -Force
+Write-Host "Release -> $(Join-Path $releaseDir 'EventMsg.exe') (v$version)"

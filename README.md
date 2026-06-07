@@ -1,40 +1,75 @@
 # upsmon-toast-notify
 
-Замена штатного `EventMsg.exe` из **UPSMON Pro** (PowerCom): вместо модальных окон — **системные toast-уведомления Windows**.
+Замена `EventMsg.exe` из **UPSMON Pro**: модальные окна → **toast-уведомления Windows**.
 
-**Установка = один файл:** подписанный `EventMsg.exe` копируется в `C:\Program Files (x86)\UPSMONPRO\` (как штатный).
-
----
-
-## Как это работает
-
-1. **UPSMONPro.exe** шлёт Windows-сообщения на скрытое окно `TnUPSMONProEventMesg`.
-2. Штатный `EventMsg.exe` показывает модальное окно.
-3. **Замена** принимает те же сообщения и показывает **toast** (WinRT внутри exe).
-
-UPSMON сам запускает `EventMsg.exe` из своей папки — отдельный планировщик и ProgramData не нужны.
+В [Releases](https://github.com/fmu1337/upsmon-toast-notify/releases) лежит один файл — **`EventMsg.exe`**.
 
 ---
 
 ## Установка
 
-1. Скачай zip из [Releases](https://github.com/fmu1337/upsmon-toast-notify/releases).
-2. Закрой UPSMON в трее.
-3. **PowerShell от администратора**:
+1. Закрой UPSMON в трее.
+2. Сохрани оригинал (на всякий случай):
 
-```powershell
-cd путь\к\распакованной\папке
-powershell -ExecutionPolicy Bypass -File .\install.ps1
+```
+C:\Program Files (x86)\UPSMONPRO\EventMsg.exe
+→ C:\Users\Public\UPSMON-Pro\backup\EventMsg.exe
 ```
 
-Скрипт:
-- ставит сертификат `UpsmonToastNotify.cer` в **Trusted Publishers** (чтобы Windows не блокировала exe);
-- бэкапит оригинал в `C:\Users\Public\UPSMON-Pro\backup\`;
-- копирует `EventMsg.exe` в `C:\Program Files (x86)\UPSMONPRO\`.
+3. Скачай `EventMsg.exe` из Releases и **разблокируй** (см. ниже), пока файл ещё в Downloads.
+4. Скопируй поверх штатного:
 
-**Вручную** (если не нужен скрипт): импортируй `UpsmonToastNotify.cer` в «Доверенные издатели», затем скопируй `EventMsg.exe` поверх старого.
+```
+C:\Program Files (x86)\UPSMONPRO\EventMsg.exe
+```
 
-4. Перезапусти UPSMON.
+5. Перезапусти UPSMON.
+
+---
+
+## Разблокировка (Windows Defender / SmartScreen)
+
+Файл с интернета помечается как «из другого компьютера». Без разблокировки Windows может не запускать exe.
+
+### Способ 1 — свойства файла
+
+1. ПКМ по `EventMsg.exe` → **Свойства**.
+2. Внизу: **Разблокировать** (Unblock) → **ОК**.
+3. Потом копируй в папку UPSMON.
+
+### Способ 2 — PowerShell
+
+```powershell
+Unblock-File -LiteralPath "$env:USERPROFILE\Downloads\EventMsg.exe"
+```
+
+Путь замени на свой. Команду выполни **до** копирования в Program Files.
+
+### Способ 3 — исключение в Defender
+
+Если после копирования exe всё равно блокируется:
+
+**Параметры → Конфиденциальность и защита → Безопасность Windows → Защита от вирусов** → **Управление параметрами** → **Исключения** → **Добавить исключение** → **Файл**:
+
+```
+C:\Program Files (x86)\UPSMONPRO\EventMsg.exe
+```
+
+Или PowerShell **от администратора**:
+
+```powershell
+Add-MpPreference -ExclusionPath "C:\Program Files (x86)\UPSMONPRO\EventMsg.exe"
+```
+
+### Smart App Control
+
+**Параметры → Конфиденциальность и защита → Безопасность Windows → Управление приложениями и браузером → Параметры Smart App Control**
+
+Если включено «Блокировка» — неподписанные exe часто не запускаются. Варианты: **Выключить** Smart App Control или добавить исключение (если политика позволяет).
+
+### Device Guard (корпоративный ПК)
+
+Сообщение *«blocked by your organization's Device Guard policy»* — это политика организации, не Defender. Нужен allowlist у IT-админа (путь или хеш файла). Домашние инструкции выше не помогут.
 
 ---
 
@@ -44,27 +79,26 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 & "C:\Program Files (x86)\UPSMONPRO\EventMsg.exe" --test-toast
 ```
 
+Должен появиться toast справа снизу.
+
 ---
 
-## Подпись
+## Если уведомлений нет
 
-Release собирается с **Authenticode** (self-signed cert `Upsmon Toast Notify`). Для вашего ПК этого достаточно после `install.ps1`.
+В `C:\Users\Public\UPSMON-Pro\UPSMON.ini` должна быть секция:
 
-| Сценарий | Что делать |
-|----------|------------|
-| Smart App Control / «неизвестный издатель» | `install.ps1` (доверяет `.cer`) |
-| Корпоративный Device Guard (WDAC) | Админ должен добавить `.cer` или хеш exe в политику |
-| Нужен «зелёный» SmartScreen | Нужен коммерческий EV-сертификат (~$300+/год) |
+```ini
+[PopMsg]
+Enable=1
+```
+
+Перезапусти UPSMON после замены exe.
 
 ---
 
 ## Откат
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\install.ps1 -Uninstall
-```
-
-Или восстанови файл из `C:\Users\Public\UPSMON-Pro\backup\EventMsg.exe`.
+Верни файл из `C:\Users\Public\UPSMON-Pro\backup\EventMsg.exe`.
 
 ---
 
@@ -81,8 +115,7 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1 -Uninstall
 ## Сборка
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\build.ps1 -Sign
-powershell -ExecutionPolicy Bypass -File .\package-release.ps1
+powershell -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
 ---
