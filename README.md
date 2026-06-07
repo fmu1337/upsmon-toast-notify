@@ -1,109 +1,96 @@
 # upsmon-toast-notify
 
-Замена штатного `EventMsg.exe` из **UPSMON Pro** (PowerCom): вместо модальных окон, которые перехватывают фокус, — **системные toast-уведомления Windows** (справа снизу, Action Center).
-
-Требуется уже установленный UPSMON Pro. Это не отдельный монитор ИБП — только другой способ показа тех же событий.
+Замена штатного `EventMsg.exe` из **UPSMON Pro** (PowerCom): вместо модальных окон — **системные toast-уведомления Windows** (справа снизу).
 
 ---
 
 ## Как это работает
 
-1. **UPSMONPro.exe** при событии (пропадание сети, низкий заряд и т.д.) запускает `EventMsg.exe` и шлёт ему Windows-сообщения на скрытое окно класса `TnUPSMONProEventMesg`.
-2. Оригинальный Delphi-`EventMsg` рисует форму с кнопкой OK и блокирует работу.
-3. **Эта замена** создаёт то же скрытое окно с тем же классом, принимает те же сообщения (`WM_COPYDATA` с пакетом `PCM…`, зарегистрированные сообщения вроде `PROStart` / `DelayEvent`) и вместо формы вызывает **Windows toast** через `Show-Toast.ps1` (WinRT).
-4. Журнал событий UPSMON (`EventRecord.CSV`) по-прежнему пишет основной процесс — мы меняем **только способ уведомления пользователя**.
+1. **UPSMONPro.exe** при событии шлёт Windows-сообщения на скрытое окно класса `TnUPSMONProEventMesg`.
+2. Штатный `EventMsg.exe` показывает модальное окно с OK.
+3. **Замена** создаёт то же скрытое окно, принимает те же сообщения и показывает **toast** через PowerShell + WinRT (`Show-Toast.ps1`).
 
-Оповещения должны быть **включены** в UPSMON: `[PopMsg] Enable=1` или галочка «Всплывающие сообщения» в GUI. Toast **заменяет** окно, а не отключает события.
+По умолчанию используется **режим listener** (Scheduled Task + PowerShell) — работает при **Device Guard / Smart App Control**, когда unsigned `EventMsg.exe` блокируется.
 
 ---
 
-## Установка из релиза (рекомендуется)
+## Установка
 
-1. Скачай **`upsmon-toast-notify-1.0.0.zip`** из [Releases](https://github.com/fmu1337/upsmon-toast-notify/releases).
-2. Распакуй в любую папку (например `C:\Tools\upsmon-toast-notify\`).
-3. Закрой UPSMON в трее (Exit).
-4. Запусти **PowerShell от имени администратора**:
+1. Скачай zip из [Releases](https://github.com/fmu1337/upsmon-toast-notify/releases).
+2. Распакуй, закрой UPSMON в трее.
+3. **PowerShell от администратора**:
 
 ```powershell
-cd C:\Tools\upsmon-toast-notify
+cd путь\к\распакованной\папке
 powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
-5. Снова запусти `UPSMONPro.exe` (или перезагрузи ПК).
+4. Перезапусти `UPSMONPro.exe` или перезагрузи ПК.
 
 Скрипт:
-- сохранит оригинальный `EventMsg.exe` в `C:\Users\Public\UPSMON-Pro\backup\` (если ещё не сохранён);
-- скопирует новый `EventMsg.exe` в `C:\Program Files (x86)\UPSMONPRO\`;
-- положит `tools\Show-Toast.ps1` рядом с установкой UPSMON;
-- при необходимости включит канал оповещений в `DisData.Dat` / `[PopMsg]`.
+- кладёт файлы в `C:\ProgramData\UpsmonToastNotify\`;
+- создаёт задачу **UpsmonToastListener** (запуск при входе);
+- переименовывает штатный `EventMsg.exe` → `EventMsg.exe.stock` (чтобы не всплывали старые окна);
+- включает `[PopMsg] Enable=1` при необходимости.
 
 ---
 
-## Проверка
+## Проверка (без EventMsg.exe)
 
 ```powershell
-& "C:\Program Files (x86)\UPSMONPRO\EventMsg.exe" --test-toast
+powershell -ExecutionPolicy Bypass -File "C:\ProgramData\UpsmonToastNotify\tools\Test-Toast.ps1"
 ```
 
-Должен появиться тестовый toast. Если нет — один раз открой «Параметры → Система → Уведомления» и разреши уведомления для ярлыка **UPSMON Notifications** (создаётся при первом toast).
-
 ---
 
-## Ручная установка (без скрипта)
+## Device Guard / «blocked by your organization's Device Guard policy»
 
-1. Останови процесс `EventMsg` (если запущен).
-2. Сделай копию `C:\Program Files (x86)\UPSMONPRO\EventMsg.exe`.
-3. Скопируй `EventMsg.exe` из архива релиза поверх старого файла.
-4. Создай `C:\Program Files (x86)\UPSMONPRO\tools\` и скопируй туда `Show-Toast.ps1`.
-5. Перезапусти UPSMON.
+Unsigned `EventMsg.exe` в `Program Files` часто **блокируется** Windows (Smart App Control, WDAC).
 
----
+**Не запускай** `EventMsg.exe --test-toast` — используй `Test-Toast.ps1` выше.
 
-## Откат на оригинал
-
-Восстанови файл из бэкапа:
+Переустанови в режиме listener (по умолчанию):
 
 ```powershell
-Copy-Item "C:\Users\Public\UPSMON-Pro\backup\EventMsg.exe" `
-  "C:\Program Files (x86)\UPSMONPRO\EventMsg.exe" -Force
+powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
-(или из своей копии до установки)
+Если раньше ставил exe в Program Files — listener отключит его и возьмёт сообщения на себя.
+
+Опционально (часто тоже блокируется):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -InstallExe
+```
+
+---
+
+## Откат
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -Uninstall
+```
+
+Или вручную восстанови `EventMsg.exe` из `C:\Users\Public\UPSMON-Pro\backup\`.
 
 ---
 
 ## Отладка
 
-Лог: `C:\Users\Public\UPSMON-Pro\event-msg.log`
-
-Режим перехвата сообщений без toast (для диагностики):
+Лог: `C:\ProgramData\UpsmonToastNotify\event-msg.log`
 
 ```powershell
-& "C:\Program Files (x86)\UPSMONPRO\EventMsg.exe" --spy
+powershell -ExecutionPolicy Bypass -File "C:\ProgramData\UpsmonToastNotify\tools\UpsmonToast-Listener.ps1" -Spy
 ```
 
 ---
 
-## Сборка из исходников
-
-Windows 10/11, встроенный .NET Framework 4.x (компилятор `csc.exe`).
+## Сборка
 
 ```powershell
-git clone git@github.com:fmu1337/upsmon-toast-notify.git
-cd upsmon-toast-notify
 powershell -ExecutionPolicy Bypass -File .\build.ps1
 powershell -ExecutionPolicy Bypass -File .\package-release.ps1
 ```
-
-Архив релиза: `release\upsmon-toast-notify-1.0.0.zip`
-
----
-
-## Ограничения
-
-- Только Windows 10/11 (toast API).
-- Нужен установленный UPSMON Pro; путь по умолчанию `C:\Program Files (x86)\UPSMONPRO\`.
-- Кнопка «Cancel Shutdown» из оригинального окна в toast **не дублируется** — отмена shutdown по-прежнему через GUI UPSMON / настройки.
 
 ---
 

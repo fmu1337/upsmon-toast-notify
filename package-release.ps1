@@ -6,7 +6,7 @@ $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $releaseDir = Join-Path $here 'release'
 New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
 
-$version = '1.0.0'
+$version = '1.0.1'
 $stage = Join-Path $releaseDir "upsmon-toast-notify-$version"
 if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
 New-Item -ItemType Directory -Force -Path (Join-Path $stage 'tools') | Out-Null
@@ -14,6 +14,8 @@ New-Item -ItemType Directory -Force -Path (Join-Path $stage 'tools') | Out-Null
 Copy-Item (Join-Path $here 'EventMsg.exe') $stage -Force
 Copy-Item (Join-Path $here 'install.ps1') $stage -Force
 Copy-Item (Join-Path $here 'tools\Show-Toast.ps1') (Join-Path $stage 'tools') -Force
+Copy-Item (Join-Path $here 'tools\Test-Toast.ps1') (Join-Path $stage 'tools') -Force
+Copy-Item (Join-Path $here 'tools\UpsmonToast-Listener.ps1') (Join-Path $stage 'tools') -Force
 Copy-Item (Join-Path $here 'README.md') $stage -Force
 
 $zip = Join-Path $releaseDir "upsmon-toast-notify-$version.zip"
