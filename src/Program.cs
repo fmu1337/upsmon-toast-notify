@@ -5,6 +5,8 @@ namespace UpsmonEventMsg
 {
     internal static class Program
     {
+        const string WindowClass = "TnUPSMONProEventMesg";
+
         static int Main(string[] args)
         {
             bool spy = HasFlag(args, "--spy");
@@ -25,17 +27,20 @@ namespace UpsmonEventMsg
                 return 0;
             }
 
+            // UPSMON may launch EventMsg again while the listener is already up.
+            if (NativeMethods.FindWindow(WindowClass, null) != IntPtr.Zero)
+                return 0;
+
             bool created;
             using (var mutex = new Mutex(true, "Global\\UpsmonEventMsgToast", out created))
             {
                 if (!created)
-                {
-                    EventLogger.Log("Second instance blocked");
                     return 0;
-                }
 
-                var catalog = EventCatalog.Load();
-                using (var host = new EventMessageHost(catalog, spy))
+                if (NativeMethods.FindWindow(WindowClass, null) != IntPtr.Zero)
+                    return 0;
+
+                using (var host = new EventMessageHost(spy))
                 {
                     EventLogger.Log("=== UpsmonEventMsg start spy=" + spy + " data=" + UpsmonPaths.DataRoot + " ===");
                     host.Run();

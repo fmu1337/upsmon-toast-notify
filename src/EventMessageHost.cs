@@ -12,19 +12,22 @@ namespace UpsmonEventMsg
         const int WsSysmenu = 0x00080000;
         const int WsMinimize = 0x20000000;
 
-        readonly EventCatalog _catalog;
         readonly bool _spy;
         readonly NativeMethods.WndProc _wndProcDelegate;
-        readonly uint[] _registeredMessages;
+        uint[] _registeredMessages = new uint[0];
+        EventCatalog _catalog;
         IntPtr _hwnd = IntPtr.Zero;
         bool _running;
 
-        public EventMessageHost(EventCatalog catalog, bool spy)
+        public EventMessageHost(bool spy)
         {
-            _catalog = catalog;
             _spy = spy;
             _wndProcDelegate = WindowProc;
-            _registeredMessages = RegisterCandidateMessages();
+        }
+
+        EventCatalog Catalog
+        {
+            get { return _catalog ?? (_catalog = EventCatalog.Load()); }
         }
 
         public void Run()
@@ -54,6 +57,8 @@ namespace UpsmonEventMsg
             NativeMethods.UpdateWindow(_hwnd);
             EventLogger.Log(_spy ? "Spy window ready" : "Toast EventMsg ready class=TnUPSMONProEventMesg");
 
+            _registeredMessages = RegisterCandidateMessages();
+
             _running = true;
             NativeMethods.Msg msg;
             while (_running && NativeMethods.GetMessage(out msg, IntPtr.Zero, 0, 0))
@@ -82,10 +87,7 @@ namespace UpsmonEventMsg
             };
             var ids = new uint[names.Length];
             for (int i = 0; i < names.Length; i++)
-            {
                 ids[i] = NativeMethods.RegisterWindowMessage(names[i]);
-                EventLogger.Log("RegisterWindowMessage(\"" + names[i] + "\")=" + ids[i]);
-            }
             return ids;
         }
 
@@ -119,9 +121,13 @@ namespace UpsmonEventMsg
 
             if (_spy) return;
 
+            // UPSMON delivers the popup text via WM_COPYDATA (PCM...).
+            if (msg != NativeMethods.WM_COPYDATA)
+                return;
+
             EventPayload payload = ParsePayload(msg, wParam, lParam);
             if (payload == null || string.IsNullOrWhiteSpace(payload.Body))
-                payload = new EventPayload { Title = _catalog.Title, Body = summary, Critical = false };
+                payload = new EventPayload { Title = Catalog.Title, Body = summary, Critical = false };
 
             ToastNotifier.Show(payload.Title, payload.Body);
         }
@@ -147,8 +153,8 @@ namespace UpsmonEventMsg
             {
                 return new EventPayload
                 {
-                    Title = _catalog.Title,
-                    Body = _catalog.DescribeEvent((byte)code),
+                    Title = Catalog.Title,
+                    Body = Catalog.DescribeEvent((byte)code),
                     Critical = IsCriticalEvent((byte)code)
                 };
             }
@@ -163,8 +169,8 @@ namespace UpsmonEventMsg
                     byte eventIndex = PcmCodeToEventIndex(head[3]);
                     return new EventPayload
                     {
-                        Title = _catalog.Title,
-                        Body = _catalog.DescribeEvent(eventIndex),
+                        Title = Catalog.Title,
+                        Body = Catalog.DescribeEvent(eventIndex),
                         Critical = IsCriticalEvent(eventIndex)
                     };
                 }
@@ -187,11 +193,11 @@ namespace UpsmonEventMsg
                 byte pcmCode = bytes[3];
                 byte eventIndex = PcmCodeToEventIndex(pcmCode);
                 string extra = ExtractEmbeddedStrings(bytes, 4);
-                string body = _catalog.DescribeEvent(eventIndex);
+                string body = Catalog.DescribeEvent(eventIndex);
                 if (!string.IsNullOrWhiteSpace(extra)) body += " — " + extra;
                 return new EventPayload
                 {
-                    Title = _catalog.Title,
+                    Title = Catalog.Title,
                     Body = body,
                     Critical = IsCriticalEvent(eventIndex)
                 };

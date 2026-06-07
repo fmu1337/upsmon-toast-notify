@@ -25,6 +25,14 @@ C:\Program Files (x86)\UPSMONPRO\EventMsg.exe
 
 5. Перезапусти UPSMON.
 
+**Важно:** `EventMsg.exe` должен работать в фоне (UPSMON запускает его сам при событии). Если toast не приходит — один раз запусти вручную и оставь:
+
+```powershell
+Start-Process "C:\Program Files (x86)\UPSMONPRO\EventMsg.exe" -WindowStyle Hidden
+```
+
+Потом снова battery test.
+
 ---
 
 ## Разблокировка (Windows Defender / SmartScreen)
