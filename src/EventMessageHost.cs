@@ -13,8 +13,10 @@ namespace UpsmonEventMsg
         const int WsSysmenu = 0x00080000;
         const int WsMinimize = 0x20000000;
         const uint WaitTimerId = 1;
+        const uint StartupPollTimerId = 2;
         const uint WaitTimeoutMs = 45000;
-        const int ExitDelayMs = 2000;
+        const uint StartupPollMs = 800;
+        const int ExitDelayMs = 1500;
 
         readonly bool _spy;
         readonly bool _ephemeral;
@@ -24,6 +26,7 @@ namespace UpsmonEventMsg
         IntPtr _hwnd = IntPtr.Zero;
         bool _running;
         int _finished;
+        int _toastShown;
 
         public EventMessageHost(bool spy)
         {
@@ -72,7 +75,10 @@ namespace UpsmonEventMsg
             _registeredMessages = RegisterCandidateMessages();
 
             if (_ephemeral)
+            {
                 NativeMethods.SetTimer(_hwnd, new IntPtr(WaitTimerId), WaitTimeoutMs, IntPtr.Zero);
+                NativeMethods.SetTimer(_hwnd, new IntPtr(StartupPollTimerId), StartupPollMs, IntPtr.Zero);
+            }
 
             _running = true;
             NativeMethods.Msg msg;
@@ -114,16 +120,31 @@ namespace UpsmonEventMsg
                 return IntPtr.Zero;
             }
 
-            if (msg == NativeMethods.WM_TIMER && wParam.ToInt64() == WaitTimerId)
+            if (msg == NativeMethods.WM_TIMER)
             {
-                OnWaitTimeout();
-                return IntPtr.Zero;
+                long id = wParam.ToInt64();
+                if (id == WaitTimerId)
+                {
+                    OnWaitTimeout();
+                    return IntPtr.Zero;
+                }
+                if (id == StartupPollTimerId)
+                {
+                    OnStartupPoll();
+                    return IntPtr.Zero;
+                }
             }
 
             if (IsCustomMessage(msg))
                 HandleCustomMessage(hWnd, msg, wParam, lParam);
 
             return DefWindowProc(hWnd, msg, wParam, lParam);
+        }
+
+        void KillStartupPollTimer()
+        {
+            if (_hwnd != IntPtr.Zero)
+                NativeMethods.KillTimer(_hwnd, new IntPtr(StartupPollTimerId));
         }
 
         bool IsCustomMessage(uint msg)
@@ -142,16 +163,37 @@ namespace UpsmonEventMsg
 
             if (_spy) return;
 
-            // UPSMON delivers the popup text via WM_COPYDATA (PCM...).
             if (msg != NativeMethods.WM_COPYDATA)
                 return;
+
+            KillStartupPollTimer();
 
             EventPayload payload = ParsePayload(msg, wParam, lParam);
             if (payload == null || string.IsNullOrWhiteSpace(payload.Body))
                 payload = new EventPayload { Title = Catalog.Title, Body = summary, Critical = false };
 
-            ToastNotifier.Show(payload.Title, payload.Body);
+            ShowToast(payload.Title, payload.Body);
             FinishAfterToast();
+        }
+
+        void OnStartupPoll()
+        {
+            if (_spy || _hwnd == IntPtr.Zero) return;
+            NativeMethods.KillTimer(_hwnd, new IntPtr(StartupPollTimerId));
+            if (Interlocked.CompareExchange(ref _toastShown, 1, 0) != 0) return;
+
+            string text = UpsmonEventPayload.ReadRecentEventMessage();
+            if (string.IsNullOrWhiteSpace(text)) return;
+
+            EventLogger.Log("Startup poll EventRecord: " + text);
+            ShowToast(Catalog.Title, text);
+            FinishAfterToast();
+        }
+
+        void ShowToast(string title, string body)
+        {
+            Interlocked.Exchange(ref _toastShown, 1);
+            ToastNotifier.Show(title, body, waitForDisplay: _ephemeral);
         }
 
         void OnWaitTimeout()
@@ -160,13 +202,15 @@ namespace UpsmonEventMsg
                 return;
 
             EventLogger.Log("Wait timeout — no WM_COPYDATA");
-            byte[] fromLog = UpsmonEventPayload.BuildFromRecentEventLog();
-            if (fromLog != null && fromLog.Length > 0)
+            if (Interlocked.CompareExchange(ref _toastShown, 0, 0) != 0)
             {
-                string text = Encoding.Default.GetString(fromLog).TrimEnd('\0');
-                if (text.Length > 0)
-                    ToastNotifier.Show(Catalog.Title, text);
+                ScheduleExit(ExitDelayMs);
+                return;
             }
+
+            string text = UpsmonEventPayload.ReadRecentEventMessage();
+            if (!string.IsNullOrWhiteSpace(text))
+                ShowToast(Catalog.Title, text);
 
             ScheduleExit(ExitDelayMs);
         }
@@ -176,7 +220,10 @@ namespace UpsmonEventMsg
             if (_spy) return;
 
             if (_hwnd != IntPtr.Zero)
+            {
                 NativeMethods.KillTimer(_hwnd, new IntPtr(WaitTimerId));
+                NativeMethods.KillTimer(_hwnd, new IntPtr(StartupPollTimerId));
+            }
             ScheduleExit(ExitDelayMs);
         }
 

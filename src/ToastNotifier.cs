@@ -21,16 +21,16 @@ namespace UpsmonEventMsg
             {
                 ToastShortcut.Ensure(exe);
                 ShowWinRtToast(title, body, ToastShortcut.AppId);
-                EventLogger.Log("Toast shown: " + title);
+                EventLogger.Log("Toast shown: " + title + " — " + body);
             }
             catch (Exception ex)
             {
                 EventLogger.Log("Toast error: " + ex.Message);
-                ShowBalloon(title, body, waitForDisplay);
+                ShowBalloon(title, body, true);
             }
 
             if (waitForDisplay)
-                Thread.Sleep(8000);
+                Thread.Sleep(4500);
         }
 
         static void BootstrapWinRt()
@@ -38,9 +38,10 @@ namespace UpsmonEventMsg
             if (_bootstrapped) return;
             _bootstrapped = true;
 
+            string framework = Environment.Is64BitProcess ? "Framework64" : "Framework";
             string winRt = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.Windows),
-                @"Microsoft.NET\Framework64\v4.0.30319\System.Runtime.WindowsRuntime.dll");
+                @"Microsoft.NET\" + framework + @"\v4.0.30319\System.Runtime.WindowsRuntime.dll");
             if (File.Exists(winRt))
                 Assembly.LoadFrom(winRt);
 
