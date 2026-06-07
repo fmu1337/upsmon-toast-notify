@@ -1,0 +1,4 @@
+EventMsg.exe
+*.log
+backup/
+release/
