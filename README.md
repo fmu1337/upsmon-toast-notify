@@ -17,7 +17,7 @@ C:\Program Files (x86)\UPSMONPRO\EventMsg.exe
 ```
 
 3. Скачай `EventMsg.exe` из Releases и **разблокируй** (см. ниже), пока файл ещё в Downloads.
-4. Скопируй поверх штатного:
+4. Скопируй поверх штатного (размер ~32 KB, не старый stub ~23 KB):
 
 ```
 C:\Program Files (x86)\UPSMONPRO\EventMsg.exe

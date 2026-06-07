@@ -21,7 +21,7 @@ namespace UpsmonEventMsg
 
             if (test)
             {
-                ToastNotifier.Show("UPSMON Pro", "Test: Windows notification instead of popup dialog", false);
+                ToastNotifier.Show("UPSMON Pro", "Test: Windows notification instead of popup dialog", waitForDisplay: true);
                 return 0;
             }
 

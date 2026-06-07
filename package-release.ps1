@@ -6,6 +6,6 @@ $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $releaseDir = Join-Path $here 'release'
 New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
 
-$version = '3.0.0'
+$version = '3.0.1'
 Copy-Item (Join-Path $here 'EventMsg.exe') (Join-Path $releaseDir 'EventMsg.exe') -Force
 Write-Host "Release -> $(Join-Path $releaseDir 'EventMsg.exe') (v$version)"

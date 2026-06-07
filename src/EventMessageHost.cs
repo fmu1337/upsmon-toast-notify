@@ -123,7 +123,7 @@ namespace UpsmonEventMsg
             if (payload == null || string.IsNullOrWhiteSpace(payload.Body))
                 payload = new EventPayload { Title = _catalog.Title, Body = summary, Critical = false };
 
-            ToastNotifier.Show(payload.Title, payload.Body, payload.Critical);
+            ToastNotifier.Show(payload.Title, payload.Body);
         }
 
         EventPayload ParsePayload(uint msg, IntPtr wParam, IntPtr lParam)

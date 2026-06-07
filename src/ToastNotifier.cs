@@ -3,29 +3,34 @@ using System.IO;
 using System.Reflection;
 using System.Security;
 using System.Text;
+using System.Threading;
 
 namespace UpsmonEventMsg
 {
-    /// <summary>
-    /// Windows 10/11 Action Center toast via WinRT (no PowerShell).
-    /// </summary>
     internal static class ToastNotifier
     {
-        const string AppId = "Powercom.UPSMONPro.EventMsg";
         static bool _bootstrapped;
 
-        public static void Show(string title, string body, bool isCritical = false)
+        public static void Show(string title, string body, bool waitForDisplay = false)
         {
+            string exe = Assembly.GetExecutingAssembly().Location;
+            if (string.IsNullOrEmpty(exe))
+                exe = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "EventMsg.exe");
+
             try
             {
-                EnsureShortcut(AppId);
-                ShowWinRtToast(title, body, AppId);
+                ToastShortcut.Ensure(exe);
+                ShowWinRtToast(title, body, ToastShortcut.AppId);
+                EventLogger.Log("Toast shown: " + title);
             }
             catch (Exception ex)
             {
                 EventLogger.Log("Toast error: " + ex.Message);
-                FallbackBalloon(title, body);
+                ShowBalloon(title, body, waitForDisplay);
             }
+
+            if (waitForDisplay)
+                Thread.Sleep(8000);
         }
 
         static void BootstrapWinRt()
@@ -39,7 +44,6 @@ namespace UpsmonEventMsg
             if (File.Exists(winRt))
                 Assembly.LoadFrom(winRt);
 
-            // Prime WinRT type loader (same types PowerShell loads).
             ResolveWinRtType("Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType=WindowsRuntime");
             ResolveWinRtType("Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom, ContentType=WindowsRuntime");
         }
@@ -95,51 +99,30 @@ namespace UpsmonEventMsg
                 .ToString();
         }
 
-        static void EnsureShortcut(string appId)
+        static void ShowBalloon(string title, string body, bool wait)
         {
-            string dir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.StartMenu),
-                "Programs", "UPSMON Pro");
-            Directory.CreateDirectory(dir);
-            string lnk = Path.Combine(dir, "UPSMON Notifications.lnk");
-            if (File.Exists(lnk)) return;
-
-            string exe = Assembly.GetExecutingAssembly().Location;
-            if (string.IsNullOrEmpty(exe))
-                exe = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "EventMsg.exe");
-            CreateShortcut(lnk, exe, "UPSMON Pro notifications");
-        }
-
-        static void CreateShortcut(string path, string target, string description)
-        {
-            Type shellType = Type.GetTypeFromProgID("WScript.Shell");
-            object shell = Activator.CreateInstance(shellType);
-            object shortcut = shellType.InvokeMember(
-                "CreateShortcut", BindingFlags.InvokeMethod, null, shell, new object[] { path });
-            shortcut.GetType().InvokeMember(
-                "TargetPath", BindingFlags.SetProperty, null, shortcut, new object[] { target });
-            shortcut.GetType().InvokeMember(
-                "Description", BindingFlags.SetProperty, null, shortcut, new object[] { description });
-            shortcut.GetType().InvokeMember(
-                "Save", BindingFlags.InvokeMethod, null, shortcut, null);
-        }
-
-        static void FallbackBalloon(string title, string body)
-        {
-            var thread = new System.Threading.Thread(() =>
+            if (!wait)
             {
-                using (var icon = new System.Windows.Forms.NotifyIcon())
-                {
-                    icon.Icon = System.Drawing.SystemIcons.Information;
-                    icon.Visible = true;
-                    icon.ShowBalloonTip(8000, title, body, System.Windows.Forms.ToolTipIcon.Info);
-                    System.Threading.Thread.Sleep(9000);
-                    icon.Visible = false;
-                }
-            });
-            thread.SetApartmentState(System.Threading.ApartmentState.STA);
-            thread.IsBackground = true;
-            thread.Start();
+                var thread = new Thread(() => ShowBalloonSync(title, body));
+                thread.SetApartmentState(ApartmentState.STA);
+                thread.IsBackground = true;
+                thread.Start();
+                return;
+            }
+
+            ShowBalloonSync(title, body);
+        }
+
+        static void ShowBalloonSync(string title, string body)
+        {
+            using (var icon = new System.Windows.Forms.NotifyIcon())
+            {
+                icon.Icon = System.Drawing.SystemIcons.Information;
+                icon.Visible = true;
+                icon.ShowBalloonTip(8000, title, body, System.Windows.Forms.ToolTipIcon.Info);
+                Thread.Sleep(9000);
+                icon.Visible = false;
+            }
         }
     }
 }
