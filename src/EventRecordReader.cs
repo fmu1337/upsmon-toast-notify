@@ -4,11 +4,12 @@ using System.Text;
 
 namespace UpsmonEventMsg
 {
-    internal static class UpsmonEventPayload
+    /// <summary>Same event text stock EventMsg reads from EventRecord.CSV.</summary>
+    internal static class EventRecordReader
     {
-        public static string ReadRecentEventMessage()
+        public static string ReadPendingMessage()
         {
-            string path = ResolveEventRecordPath();
+            string path = ResolvePath();
             if (path == null || !File.Exists(path)) return null;
 
             try
@@ -31,18 +32,10 @@ namespace UpsmonEventMsg
             return null;
         }
 
-        public static byte[] BuildFromRecentEventLog()
-        {
-            string message = ReadRecentEventMessage();
-            if (string.IsNullOrWhiteSpace(message)) return null;
-            return Encoding.Default.GetBytes(message);
-        }
-
-        static string ResolveEventRecordPath()
+        static string ResolvePath()
         {
             string root = UpsmonPaths.DataRoot;
-            int month = DateTime.Now.Month;
-            string nested = Path.Combine(root, month.ToString(), "EventRecord.CSV");
+            string nested = Path.Combine(root, DateTime.Now.Month.ToString(), "EventRecord.CSV");
             if (File.Exists(nested)) return nested;
             return Path.Combine(root, "EventRecord.CSV");
         }

@@ -1,4 +1,5 @@
 EventMsg.exe
+EventMsg-Dev.exe
 *.log
 backup/
 release/

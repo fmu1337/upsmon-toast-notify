@@ -21,5 +21,7 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: release/EventMsg.exe
+          files: |
+            release/EventMsg.exe
+            release/EventMsg-Dev.exe
           generate_release_notes: true

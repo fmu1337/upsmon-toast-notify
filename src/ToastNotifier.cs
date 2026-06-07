@@ -9,6 +9,9 @@ namespace UpsmonEventMsg
 {
     internal static class ToastNotifier
     {
+        const string ToastTag = "UpsmonEvent";
+        const string ToastGroup = "UpsmonPro";
+
         static bool _bootstrapped;
 
         public static void Show(string title, string body, bool waitForDisplay = false)
@@ -21,7 +24,7 @@ namespace UpsmonEventMsg
             {
                 ToastShortcut.Ensure(exe);
                 ShowWinRtToast(title, body, ToastShortcut.AppId);
-                EventLogger.Log("Toast shown: " + title + " — " + body);
+                EventLogger.Log("Toast: " + body);
             }
             catch (Exception ex)
             {
@@ -32,6 +35,15 @@ namespace UpsmonEventMsg
             if (waitForDisplay)
                 Thread.Sleep(4500);
         }
+
+#if DEV_BUILD
+        public static void ShowReplaceTest()
+        {
+            Show("UPSMON Pro", "First — do not close", waitForDisplay: false);
+            Thread.Sleep(2500);
+            Show("UPSMON Pro", "Second — should replace first", waitForDisplay: true);
+        }
+#endif
 
         static void BootstrapWinRt()
         {
@@ -60,15 +72,66 @@ namespace UpsmonEventMsg
             Type toastType = ResolveWinRtType(
                 "Windows.UI.Notifications.ToastNotification, Windows.UI.Notifications, ContentType=WindowsRuntime");
 
+            DismissAppToasts(managerType, appId);
+
             string xml = BuildToastXml(title, body);
             object doc = Activator.CreateInstance(docType);
             docType.GetMethod("LoadXml", new[] { typeof(string) }).Invoke(doc, new object[] { xml });
 
             object toast = Activator.CreateInstance(toastType, doc);
+            ConfigureToast(toast);
+
             object notifier = managerType
                 .GetMethod("CreateToastNotifier", new[] { typeof(string) })
                 .Invoke(null, new object[] { appId });
             notifier.GetType().GetMethod("Show").Invoke(notifier, new[] { toast });
+        }
+
+        static void ConfigureToast(object toast)
+        {
+            SetProperty(toast, "Tag", ToastTag);
+            SetProperty(toast, "Group", ToastGroup);
+            SetProperty(toast, "SuppressPopup", false);
+        }
+
+        static void SetProperty(object target, string name, object value)
+        {
+            PropertyInfo prop = target.GetType().GetProperty(name);
+            if (prop != null && prop.CanWrite)
+                prop.SetValue(target, value, null);
+        }
+
+        static void DismissAppToasts(Type managerType, string appId)
+        {
+            try
+            {
+                object history = managerType.GetProperty("History").GetValue(null, null);
+                if (history == null) return;
+
+                TryHistory(history, "Remove", ToastTag, ToastGroup, appId);
+                TryHistory(history, "RemoveGroup", ToastGroup, appId);
+                TryHistory(history, "Clear", appId);
+                Thread.Sleep(150);
+            }
+            catch { }
+        }
+
+        static void TryHistory(object history, string name, params object[] args)
+        {
+            foreach (MethodInfo method in history.GetType().GetMethods())
+            {
+                if (!string.Equals(method.Name, name, StringComparison.Ordinal)) continue;
+                ParameterInfo[] p = method.GetParameters();
+                if (p.Length != args.Length) continue;
+                for (int i = 0; i < p.Length; i++)
+                {
+                    if (args[i] != null && !p[i].ParameterType.IsAssignableFrom(args[i].GetType()))
+                        goto next;
+                }
+                try { method.Invoke(history, args); } catch { }
+                return;
+                next: ;
+            }
         }
 
         static Type ResolveWinRtType(string fullName)
@@ -90,8 +153,8 @@ namespace UpsmonEventMsg
             string escapedTitle = SecurityElement.Escape(title) ?? string.Empty;
             string escapedBody = SecurityElement.Escape(body) ?? string.Empty;
             return new StringBuilder()
-                .AppendLine("<toast activationType=\"foreground\" duration=\"long\">")
-                .AppendLine("  <audio silent=\"true\"/>")
+                .AppendLine("<toast activationType=\"foreground\" duration=\"long\" priority=\"high\">")
+                .AppendLine("  <audio src=\"ms-winsoundevent:Notification.Default\"/>")
                 .AppendLine("  <visual><binding template=\"ToastGeneric\">")
                 .AppendLine("    <text>" + escapedTitle + "</text>")
                 .AppendLine("    <text>" + escapedBody + "</text>")
