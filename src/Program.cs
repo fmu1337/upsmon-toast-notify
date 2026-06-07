@@ -5,7 +5,7 @@ namespace UpsmonEventMsg
 {
     internal static class Program
     {
-        const string SingleInstanceMutex = "Global\\UpsmonEventMsg_v304";
+        const string SingleInstanceMutex = "Global\\UpsmonEventMsg_v305";
 
         static int Main(string[] args)
         {

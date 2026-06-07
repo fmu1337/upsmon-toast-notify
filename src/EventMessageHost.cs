@@ -55,7 +55,12 @@ namespace UpsmonEventMsg
 
             NativeMethods.ShowWindow(_hwnd, SwHide);
             NativeMethods.UpdateWindow(_hwnd);
-            EventLogger.Log(_spy ? "Spy window ready" : "Toast EventMsg ready class=TnUPSMONProEventMesg");
+
+            var className = new StringBuilder(256);
+            NativeMethods.GetClassName(_hwnd, className, className.Capacity);
+            EventLogger.Log((_spy ? "Spy window ready" : "Toast EventMsg ready")
+                + " hwnd=0x" + _hwnd.ToInt64().ToString("X")
+                + " class=" + className);
 
             _registeredMessages = RegisterCandidateMessages();
 
