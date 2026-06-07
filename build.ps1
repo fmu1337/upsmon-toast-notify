@@ -1,4 +1,6 @@
-# Build EventMsg.exe - single binary toast replacement for UPSMON PRO (.NET 4.x, no SDK).
+# Build EventMsg.exe - toast replacement for UPSMON PRO (.NET 4.x, no SDK).
+param([switch]$Sign)
+
 $ErrorActionPreference = 'Stop'
 $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -15,3 +17,7 @@ if (-not (Test-Path $csc)) { throw "csc.exe not found: $csc" }
 
 if ($LASTEXITCODE -ne 0) { throw "build failed ($LASTEXITCODE)" }
 Write-Host "OK -> $out"
+
+if ($Sign) {
+    & (Join-Path $here 'sign.ps1') -FilePath $out -ExportCert
+}

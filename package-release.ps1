@@ -1,17 +1,18 @@
-# Builds EventMsg.exe and packs a release zip for GitHub.
+# Builds signed EventMsg.exe and packs a release zip for GitHub.
 $ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
-& (Join-Path $here 'build.ps1')
+& (Join-Path $here 'build.ps1') -Sign
 
 $releaseDir = Join-Path $here 'release'
 New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
 
-$version = '2.0.0'
+$version = '2.1.0'
 $stage = Join-Path $releaseDir "upsmon-toast-notify-$version"
 if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 
 Copy-Item (Join-Path $here 'EventMsg.exe') $stage -Force
+Copy-Item (Join-Path $here 'UpsmonToastNotify.cer') $stage -Force
 Copy-Item (Join-Path $here 'install.ps1') $stage -Force
 Copy-Item (Join-Path $here 'README.md') $stage -Force
 

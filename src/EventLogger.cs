@@ -15,11 +15,7 @@ namespace UpsmonEventMsg
             get
             {
                 if (_logPath != null) return _logPath;
-                string baseDir = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/');
-                if (baseDir.IndexOf("UpsmonToastNotify", StringComparison.OrdinalIgnoreCase) >= 0)
-                    _logPath = Path.Combine(baseDir, "event-msg.log");
-                else
-                    _logPath = Path.Combine(UpsmonPaths.DataRoot, "event-msg.log");
+                _logPath = Path.Combine(UpsmonPaths.DataRoot, "event-msg.log");
                 return _logPath;
             }
         }
