@@ -1,4 +1,4 @@
-# Build EventMsg.exe — toast replacement for UPSMON PRO popups (.NET 4.x, no SDK).
+# Build EventMsg.exe - single binary toast replacement for UPSMON PRO (.NET 4.x, no SDK).
 $ErrorActionPreference = 'Stop'
 $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path

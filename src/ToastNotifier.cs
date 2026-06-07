@@ -1,49 +1,25 @@
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Reflection;
+using System.Security;
 using System.Text;
 
 namespace UpsmonEventMsg
 {
     /// <summary>
-    /// Windows 10/11 Action Center toast (via PowerShell WinRT — reliable on .NET 4.x).
+    /// Windows 10/11 Action Center toast via WinRT (no PowerShell).
     /// </summary>
     internal static class ToastNotifier
     {
         const string AppId = "Powercom.UPSMONPro.EventMsg";
+        static bool _bootstrapped;
 
         public static void Show(string title, string body, bool isCritical = false)
         {
             try
             {
                 EnsureShortcut(AppId);
-                string script = ResolveToastScript();
-                if (string.IsNullOrEmpty(script) || !File.Exists(script))
-                {
-                    FallbackBalloon(title, body);
-                    return;
-                }
-
-                string args = string.Format(
-                    "-NoProfile -ExecutionPolicy Bypass -File \"{0}\" -Title \"{1}\" -Body \"{2}\" -AppId \"{3}\"",
-                    script,
-                    EscapeArg(title),
-                    EscapeArg(body),
-                    AppId);
-
-                var psi = new ProcessStartInfo
-                {
-                    FileName = "powershell.exe",
-                    Arguments = args,
-                    CreateNoWindow = true,
-                    UseShellExecute = false,
-                    WindowStyle = ProcessWindowStyle.Hidden
-                };
-                using (var p = Process.Start(psi))
-                {
-                    if (p != null) p.WaitForExit(5000);
-                }
+                ShowWinRtToast(title, body, AppId);
             }
             catch (Exception ex)
             {
@@ -52,22 +28,71 @@ namespace UpsmonEventMsg
             }
         }
 
-        static string ResolveToastScript()
+        static void BootstrapWinRt()
         {
-            string[] candidates =
-            {
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tools", "Show-Toast.ps1"),
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Show-Toast.ps1")
-            };
-            foreach (string path in candidates)
-                if (File.Exists(path)) return path;
-            return candidates[0];
+            if (_bootstrapped) return;
+            _bootstrapped = true;
+
+            string winRt = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+                @"Microsoft.NET\Framework64\v4.0.30319\System.Runtime.WindowsRuntime.dll");
+            if (File.Exists(winRt))
+                Assembly.LoadFrom(winRt);
+
+            // Prime WinRT type loader (same types PowerShell loads).
+            ResolveWinRtType("Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType=WindowsRuntime");
+            ResolveWinRtType("Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom, ContentType=WindowsRuntime");
         }
 
-        static string EscapeArg(string value)
+        static void ShowWinRtToast(string title, string body, string appId)
         {
-            if (string.IsNullOrEmpty(value)) return string.Empty;
-            return value.Replace("\"", "`\"");
+            BootstrapWinRt();
+
+            Type managerType = ResolveWinRtType(
+                "Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType=WindowsRuntime");
+            Type docType = ResolveWinRtType(
+                "Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom, ContentType=WindowsRuntime");
+            Type toastType = ResolveWinRtType(
+                "Windows.UI.Notifications.ToastNotification, Windows.UI.Notifications, ContentType=WindowsRuntime");
+
+            string xml = BuildToastXml(title, body);
+            object doc = Activator.CreateInstance(docType);
+            docType.GetMethod("LoadXml", new[] { typeof(string) }).Invoke(doc, new object[] { xml });
+
+            object toast = Activator.CreateInstance(toastType, doc);
+            object notifier = managerType
+                .GetMethod("CreateToastNotifier", new[] { typeof(string) })
+                .Invoke(null, new object[] { appId });
+            notifier.GetType().GetMethod("Show").Invoke(notifier, new[] { toast });
+        }
+
+        static Type ResolveWinRtType(string fullName)
+        {
+            Type type = Type.GetType(fullName, false);
+            if (type != null) return type;
+
+            foreach (Assembly asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                type = asm.GetType(fullName, false);
+                if (type != null) return type;
+            }
+
+            throw new InvalidOperationException("WinRT type not found: " + fullName);
+        }
+
+        static string BuildToastXml(string title, string body)
+        {
+            string escapedTitle = SecurityElement.Escape(title) ?? string.Empty;
+            string escapedBody = SecurityElement.Escape(body) ?? string.Empty;
+            return new StringBuilder()
+                .AppendLine("<toast activationType=\"foreground\" duration=\"long\">")
+                .AppendLine("  <audio silent=\"true\"/>")
+                .AppendLine("  <visual><binding template=\"ToastGeneric\">")
+                .AppendLine("    <text>" + escapedTitle + "</text>")
+                .AppendLine("    <text>" + escapedBody + "</text>")
+                .AppendLine("  </binding></visual>")
+                .AppendLine("</toast>")
+                .ToString();
         }
 
         static void EnsureShortcut(string appId)
@@ -87,16 +112,16 @@ namespace UpsmonEventMsg
 
         static void CreateShortcut(string path, string target, string description)
         {
-            var shellType = Type.GetTypeFromProgID("WScript.Shell");
+            Type shellType = Type.GetTypeFromProgID("WScript.Shell");
             object shell = Activator.CreateInstance(shellType);
             object shortcut = shellType.InvokeMember(
-                "CreateShortcut", System.Reflection.BindingFlags.InvokeMethod, null, shell, new object[] { path });
+                "CreateShortcut", BindingFlags.InvokeMethod, null, shell, new object[] { path });
             shortcut.GetType().InvokeMember(
-                "TargetPath", System.Reflection.BindingFlags.SetProperty, null, shortcut, new object[] { target });
+                "TargetPath", BindingFlags.SetProperty, null, shortcut, new object[] { target });
             shortcut.GetType().InvokeMember(
-                "Description", System.Reflection.BindingFlags.SetProperty, null, shortcut, new object[] { description });
+                "Description", BindingFlags.SetProperty, null, shortcut, new object[] { description });
             shortcut.GetType().InvokeMember(
-                "Save", System.Reflection.BindingFlags.InvokeMethod, null, shortcut, null);
+                "Save", BindingFlags.InvokeMethod, null, shortcut, null);
         }
 
         static void FallbackBalloon(string title, string body)

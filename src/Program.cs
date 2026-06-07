@@ -12,10 +12,16 @@ namespace UpsmonEventMsg
 
             if (HasFlag(args, "--help") || HasFlag(args, "-h"))
             {
-                Console.WriteLine("EventMsg.exe — Windows toast replacement for UPSMON PRO popups");
+                Console.WriteLine("EventMsg.exe - Windows toast replacement for UPSMON PRO popups");
                 Console.WriteLine("  (no args)      Run message listener + toast notifications");
                 Console.WriteLine("  --spy          Log UPSMON messages to event-msg.log (no toast)");
                 Console.WriteLine("  --test-toast   Show one sample toast and exit");
+                return 0;
+            }
+
+            if (test)
+            {
+                ToastNotifier.Show("UPSMON Pro", "Test: Windows notification instead of popup dialog", false);
                 return 0;
             }
 
@@ -25,12 +31,6 @@ namespace UpsmonEventMsg
                 if (!created)
                 {
                     EventLogger.Log("Second instance blocked");
-                    return 0;
-                }
-
-                if (test)
-                {
-                    ToastNotifier.Show("UPSMON Pro", "Тест: уведомление Windows вместо всплывающего окна", false);
                     return 0;
                 }
 
