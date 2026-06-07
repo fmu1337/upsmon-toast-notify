@@ -5,7 +5,7 @@ namespace UpsmonEventMsg
 {
     internal static class Program
     {
-        const string WindowClass = "TnUPSMONProEventMesg";
+        const string SingleInstanceMutex = "Global\\UpsmonEventMsg_v304";
 
         static int Main(string[] args)
         {
@@ -27,18 +27,14 @@ namespace UpsmonEventMsg
                 return 0;
             }
 
-            // UPSMON may launch EventMsg again while the listener is already up.
-            if (NativeMethods.FindWindow(WindowClass, null) != IntPtr.Zero)
-                return 0;
-
             bool created;
-            using (var mutex = new Mutex(true, "Global\\UpsmonEventMsgToast", out created))
+            using (var mutex = new Mutex(true, SingleInstanceMutex, out created))
             {
                 if (!created)
+                {
+                    EventLogger.Log("Listener already running");
                     return 0;
-
-                if (NativeMethods.FindWindow(WindowClass, null) != IntPtr.Zero)
-                    return 0;
+                }
 
                 using (var host = new EventMessageHost(spy))
                 {

@@ -53,6 +53,9 @@ namespace UpsmonEventMsg
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
 
+        [DllImport("user32.dll")]
+        public static extern bool IsWindow(IntPtr hWnd);
+
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
 
