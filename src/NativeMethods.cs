@@ -68,6 +68,17 @@ namespace UpsmonEventMsg
         [DllImport("kernel32.dll")]
         public static extern IntPtr LocalFree(IntPtr hMem);
 
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        public static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        public static extern bool KillTimer(IntPtr hWnd, IntPtr uIDEvent);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr SetTimer(IntPtr hWnd, IntPtr nIDEvent, uint uElapse, IntPtr lpTimerFunc);
+
+        public const int WM_TIMER = 0x0113;
+
         [DllImport("kernel32.dll", CharSet = CharSet.Auto)]
         public static extern int GetPrivateProfileString(
             string section, string key, string def, StringBuilder retVal,

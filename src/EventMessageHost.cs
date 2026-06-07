@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 
 namespace UpsmonEventMsg
 {
@@ -11,17 +12,23 @@ namespace UpsmonEventMsg
         const int WsCaption = 0x00C00000;
         const int WsSysmenu = 0x00080000;
         const int WsMinimize = 0x20000000;
+        const uint WaitTimerId = 1;
+        const uint WaitTimeoutMs = 45000;
+        const int ExitDelayMs = 2000;
 
         readonly bool _spy;
+        readonly bool _ephemeral;
         readonly NativeMethods.WndProc _wndProcDelegate;
         uint[] _registeredMessages = new uint[0];
         EventCatalog _catalog;
         IntPtr _hwnd = IntPtr.Zero;
         bool _running;
+        int _finished;
 
         public EventMessageHost(bool spy)
         {
             _spy = spy;
+            _ephemeral = !spy;
             _wndProcDelegate = WindowProc;
         }
 
@@ -58,11 +65,14 @@ namespace UpsmonEventMsg
 
             var className = new StringBuilder(256);
             NativeMethods.GetClassName(_hwnd, className, className.Capacity);
-            EventLogger.Log((_spy ? "Spy window ready" : "Toast EventMsg ready")
+            EventLogger.Log((_spy ? "Spy window ready" : "EventMsg ready (toast and exit)")
                 + " hwnd=0x" + _hwnd.ToInt64().ToString("X")
                 + " class=" + className);
 
             _registeredMessages = RegisterCandidateMessages();
+
+            if (_ephemeral)
+                NativeMethods.SetTimer(_hwnd, new IntPtr(WaitTimerId), WaitTimeoutMs, IntPtr.Zero);
 
             _running = true;
             NativeMethods.Msg msg;
@@ -104,6 +114,12 @@ namespace UpsmonEventMsg
                 return IntPtr.Zero;
             }
 
+            if (msg == NativeMethods.WM_TIMER && wParam.ToInt64() == WaitTimerId)
+            {
+                OnWaitTimeout();
+                return IntPtr.Zero;
+            }
+
             if (IsCustomMessage(msg))
                 HandleCustomMessage(hWnd, msg, wParam, lParam);
 
@@ -135,6 +151,44 @@ namespace UpsmonEventMsg
                 payload = new EventPayload { Title = Catalog.Title, Body = summary, Critical = false };
 
             ToastNotifier.Show(payload.Title, payload.Body);
+            FinishAfterToast();
+        }
+
+        void OnWaitTimeout()
+        {
+            if (_spy || Interlocked.CompareExchange(ref _finished, 1, 0) != 0)
+                return;
+
+            EventLogger.Log("Wait timeout — no WM_COPYDATA");
+            byte[] fromLog = UpsmonEventPayload.BuildFromRecentEventLog();
+            if (fromLog != null && fromLog.Length > 0)
+            {
+                string text = Encoding.Default.GetString(fromLog).TrimEnd('\0');
+                if (text.Length > 0)
+                    ToastNotifier.Show(Catalog.Title, text);
+            }
+
+            ScheduleExit(ExitDelayMs);
+        }
+
+        void FinishAfterToast()
+        {
+            if (_spy) return;
+
+            if (_hwnd != IntPtr.Zero)
+                NativeMethods.KillTimer(_hwnd, new IntPtr(WaitTimerId));
+            ScheduleExit(ExitDelayMs);
+        }
+
+        void ScheduleExit(int delayMs)
+        {
+            IntPtr hwnd = _hwnd;
+            ThreadPool.QueueUserWorkItem(_ =>
+            {
+                Thread.Sleep(delayMs);
+                if (hwnd != IntPtr.Zero)
+                    NativeMethods.PostMessage(hwnd, 0x0010, IntPtr.Zero, IntPtr.Zero);
+            });
         }
 
         EventPayload ParsePayload(uint msg, IntPtr wParam, IntPtr lParam)
@@ -209,8 +263,33 @@ namespace UpsmonEventMsg
             }
 
             string text = Encoding.Default.GetString(bytes).TrimEnd('\0');
+            if (text.Length >= 1 && text.Length <= 2)
+            {
+                byte eventIndex;
+                if (TryParseEventIndexText(text, out eventIndex))
+                {
+                    return new EventPayload
+                    {
+                        Title = Catalog.Title,
+                        Body = Catalog.DescribeEvent(eventIndex),
+                        Critical = IsCriticalEvent(eventIndex)
+                    };
+                }
+            }
             if (text.Length >= 2) return BuildFromText(text);
             return null;
+        }
+
+        static bool TryParseEventIndexText(string text, out byte eventIndex)
+        {
+            eventIndex = 0;
+            text = text.Trim();
+            if (text.Length == 0) return false;
+            int value;
+            if (!int.TryParse(text, out value)) return false;
+            if (value < 2 || value > 22) return false;
+            eventIndex = (byte)value;
+            return true;
         }
 
         static EventPayload BuildFromText(string text)

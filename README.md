@@ -25,13 +25,7 @@ C:\Program Files (x86)\UPSMONPRO\EventMsg.exe
 
 5. Перезапусти UPSMON.
 
-**Важно:** `EventMsg.exe` должен работать в фоне (UPSMON запускает его сам при событии). Если toast не приходит — один раз запусти вручную и оставь:
-
-```powershell
-Start-Process "C:\Program Files (x86)\UPSMONPRO\EventMsg.exe" -WindowStyle Hidden
-```
-
-Потом снова battery test.
+**Не запускай EventMsg вручную** — UPSMON сам стартует его при событии, показывает toast и процесс завершается (как штатное окно после OK).
 
 ---
 
@@ -101,6 +95,21 @@ Enable=1
 ```
 
 Перезапусти UPSMON после замены exe.
+
+### Старый listener v1/v2 (PowerShell)
+
+Если раньше ставили `install.ps1`, мог остаться **фоновый PowerShell** с тем же окном `TnUPSMONProEventMesg`. UPSMON шлёт события **первому** такому окну — toast не приходит, в логе пусто.
+
+**v3.0.6+** при старте пытается завершить такой процесс сам. Если не получилось — PowerShell **от администратора**:
+
+```powershell
+Unregister-ScheduledTask -TaskName UpsmonToastListener -Confirm:$false
+Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" |
+  Where-Object { $_.CommandLine -like '*UpsmonToast*' } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+```
+
+Потом перезапусти `EventMsg.exe` и UPSMON. В логе не должно быть `WARNING: legacy listener`.
 
 ---
 
