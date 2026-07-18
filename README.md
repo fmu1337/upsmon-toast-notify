@@ -1,236 +1,165 @@
 <p align="center">
-  <strong>upsmon-toast-notify</strong><br>
-  Toast-уведомления Windows вместо модальных окон UPSMON Pro
+  <strong>UPSMON Toast Notify</strong><br>
+  Уведомления Windows вместо надоедливых окон UPSMON Pro
 </p>
 
 <p align="center">
-  <a href="https://github.com/fmu1337/upsmon-toast-notify/releases/tag/v3.2.1">Release v3.2.1</a> ·
-  <a href="CHANGELOG.md">Changelog</a> ·
-  <a href="LICENSE">MIT License</a>
+  <a href="https://github.com/fmu1337/upsmon-toast-notify/releases/latest"><img src="https://img.shields.io/github/v/release/fmu1337/upsmon-toast-notify?label=скачать&color=blue" alt="Latest release"></a>
+  <img src="https://img.shields.io/badge/Windows-10%20%2F%2011-0078D6?logo=windows&logoColor=white" alt="Windows">
+  <img src="https://img.shields.io/badge/лицензия-MIT-green" alt="MIT">
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Windows-10%20%2F%2011-blue?logo=windows&logoColor=white" alt="Windows 10/11">
-  <img src="https://img.shields.io/badge/arch-x86-lightgrey" alt="x86">
-  <img src="https://img.shields.io/badge/.NET%20Framework-4.x-purple" alt=".NET Framework 4.x">
-  <img src="https://img.shields.io/badge/UPSMON%20Pro-compatible-green" alt="UPSMON Pro">
+  <img src="docs/toast-example.png" alt="Пример уведомления: питание восстановлено" width="400">
 </p>
 
 ---
 
-## О проекте
+## Зачем это нужно
 
-**upsmon-toast-notify** — drop-in замена штатного `EventMsg.exe` из [UPSMON Pro](https://www.powercom.com/).  
-UPSMON по-прежнему сам запускает exe при каждом событии; вместо окна с кнопкой **OK** появляется системный toast.
+В **UPSMON Pro** при отключении света, тесте батареи и других событиях выскакивает окно с кнопкой **OK**. Пока его не закроешь — оно висит поверх всего.
 
-<p align="center">
-  <img src="docs/toast-example.png" alt="Пример toast: UPSMON Pro — Power Restore" width="420">
-  <br>
-  <sub><em>Power Restore — новое событие перебивает предыдущий toast</em></sub>
-</p>
+Этот проект **заменяет** то окно на обычное **уведомление Windows** справа снизу:
 
-| Было (stock) | Стало |
-|--------------|-------|
-| Модальное окно, ждёт OK | Toast ~25 сек, со звуком |
-| Нужно переключаться на окно | Уведомление в углу экрана |
-| Держать процесс не нужно | Запуск → toast → выход |
+- само появляется и через ~25 секунд уходит;
+- со звуком (если звук уведомлений включён);
+- новое событие сменяет предыдущее (не нужно ничего закрывать);
+- UPSMON работает как раньше — ничего вручную запускать не надо.
 
 ---
 
-## Возможности
+## Что скачать
 
-- **Совместимость** — тот же протокол, что у штатного EventMsg (`EventRecord.CSV`, скрытое окно для UPSMON)
-- **Замена toast** — Power Failure → Power Restore, Self Test → Battery Normal
-- **Звук** — системное уведомление (настраивается в Windows)
-- **Два бинарника** — production для UPSMON и dev для тестов
-- **x86** — как у 32-bit UPSMON Pro
+На странице [Releases](https://github.com/fmu1337/upsmon-toast-notify/releases) два файла:
 
----
-
-## Быстрая установка
-
-1. Скачай **`EventMsg.exe`** из [Releases](https://github.com/fmu1337/upsmon-toast-notify/releases)
-2. Разблокируй файл (`Unblock` в свойствах или `Unblock-File`)
-3. Закрой UPSMON, сохрани backup:
-
-   ```
-   C:\Program Files (x86)\UPSMONPRO\EventMsg.exe
-   → C:\Users\Public\UPSMON-Pro\backup\EventMsg.exe
-   ```
-
-4. Скопируй новый exe:
-
-   ```
-   C:\Program Files (x86)\UPSMONPRO\EventMsg.exe
-   ```
-
-5. В `UPSMON.ini`:
-
-   ```ini
-   [PopMsg]
-   Enable=1
-   ```
-
-6. Перезапусти UPSMON
-
-> Ставь только **`EventMsg.exe`**. **`EventMsg-Dev.exe`** — для тестов, не копируй в UPSMON.
-
----
-
-## Releases
-
-| Файл | Назначение |
+| Файл | Кому нужен |
 |------|------------|
-| **`EventMsg.exe`** | Production — установка в UPSMON |
-| **`EventMsg-Dev.exe`** | Dev — `--test-toast`, `--test-toast-replace`, `--spy` |
+| **EventMsg.exe** | Всем — его ставят вместо штатного |
+| **EventMsg-Dev.exe** | Необязательно — только чтобы проверить уведомление без ИБП |
+
+Берите **`EventMsg.exe`**.
 
 ---
 
-## Как это работает
+## Установка (5 минут)
+
+### 1. Закройте UPSMON
+
+Иконка в трее (возле часов) → выход / закрыть.
+
+### 2. Сохраните оригинал
+
+Скопируйте файл себе «на всякий случай»:
+
+`C:\Program Files (x86)\UPSMONPRO\EventMsg.exe`  
+→ например в `C:\Users\Public\UPSMON-Pro\backup\`
+
+### 3. Скачайте и разблокируйте
+
+1. Скачайте **EventMsg.exe** из [последнего релиза](https://github.com/fmu1337/upsmon-toast-notify/releases/latest).
+2. Пока файл в папке «Загрузки»: правая кнопка → **Свойства**.
+3. Если внизу есть галочка **Разблокировать** — поставьте её → ОК.
+
+Без этого Windows иногда не даёт запустить файл, скачанный из интернета.
+
+### 4. Замените файл
+
+Скопируйте скачанный `EventMsg.exe` сюда (с заменой):
 
 ```
-UPSMON событие
-    ↓
-WinExec EventMsg.exe
-    ↓
-Чтение EventRecord.CSV + протокол UPSMON
-    ↓
-WinRT toast (звук, ~25 сек)
-    ↓
-Процесс завершается
+C:\Program Files (x86)\UPSMONPRO\EventMsg.exe
 ```
 
-Модальное окно **не показывается**. Exe **не нужно** держать в фоне вручную.
+Может понадобиться разрешение администратора — это нормально.
+
+### 5. Проверьте настройки UPSMON
+
+Откройте файл:
+
+`C:\Users\Public\UPSMON-Pro\UPSMON.ini`
+
+Найдите секцию `[PopMsg]` и убедитесь, что там:
+
+```ini
+[PopMsg]
+Enable=1
+```
+
+Если было `Enable=0` — поставьте `1` и сохраните.
+
+### 6. Запустите UPSMON снова
+
+Готово. Дальше ничего делать не нужно — уведомления придут сами.
 
 ---
 
-## Проверка
+## Как проверить, что всё работает
 
-**Dev-бинарник** (без UPSMON):
+**Вариант A — через UPSMON** (как в жизни):
 
-```powershell
-.\EventMsg-Dev.exe --test-toast
-.\EventMsg-Dev.exe --test-toast-replace
+| Что сделать | Что должно появиться |
+|-------------|----------------------|
+| Тест батареи в UPSMON | «UPS Self Test», потом «Battery Normal» |
+| Вытащить шнур сети из ИБП | «Power Failure» |
+| Воткнуть обратно | «Power Restore» |
+
+**Вариант B — без ИБП:** скачайте также `EventMsg-Dev.exe`, дважды щёлкните или запустите:
+
+```
+EventMsg-Dev.exe --test-toast
 ```
 
-**Через UPSMON:**
-
-| Действие | Toast |
-|----------|-------|
-| Battery test | UPS Self Test → Battery Normal |
-| Сеть от ИБП | Power Failure |
-| Сеть вернулась | Power Restore |
-
-**Лог:** `C:\Users\Public\UPSMON-Pro\event-msg.log`
-
-```powershell
-Get-Content 'C:\Users\Public\UPSMON-Pro\event-msg.log' -Tail 20
-```
-
-**Звук:** Параметры → Система → Уведомления → **UPSMON Pro** (не «без звука»).
+Должно всплыть тестовое уведомление.
 
 ---
 
-## Troubleshooting
+## Если уведомлений нет
 
-<details>
-<summary><strong>Уведомлений нет</strong></summary>
+1. **Включён ли звук / баннеры Windows**  
+   Параметры → Система → Уведомления → найдите **UPSMON Pro** (или UPSMON Notifications) → баннеры и звук включены.  
+   Режим «Не беспокоить» может всё глушить.
 
-1. `[PopMsg] Enable=1` в `UPSMON.ini`
-2. Уведомления для UPSMON Pro включены в Windows
-3. Очисти старые toast (Win+N)
-4. `tasklist | findstr /i EventMsg` — между событиями должно быть пусто
+2. **Включён ли показ сообщений в UPSMON**  
+   В `UPSMON.ini` должно быть `[PopMsg]` → `Enable=1` (см. установку выше).
 
-</details>
+3. **Не блокирует ли Windows файл**  
+   Снова разблокируйте `EventMsg.exe` (шаг 3) или добавьте его в исключения Защитника Windows.
 
-<details>
-<summary><strong>Defender / SmartScreen блокирует exe</strong></summary>
-
-```powershell
-Unblock-File -LiteralPath "$env:USERPROFILE\Downloads\EventMsg.exe"
-```
-
-Или исключение:
-
-```powershell
-Add-MpPreference -ExclusionPath "C:\Program Files (x86)\UPSMONPRO\EventMsg.exe"
-```
-
-Smart App Control в режиме «Блокировка» может не пускать неподписанные exe.
-
-</details>
-
-<details>
-<summary><strong>Старый PowerShell listener (v1/v2)</strong></summary>
-
-Если ставили старый `install.ps1`, мог остаться фоновый listener с тем же окном — toast не дойдёт.
-
-```powershell
-Unregister-ScheduledTask -TaskName UpsmonToastListener -Confirm:$false
-Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" |
-  Where-Object { $_.CommandLine -like '*UpsmonToast*' } |
-  ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
-```
-
-Скрипт: [`tools/Remove-LegacyListener.ps1`](tools/Remove-LegacyListener.ps1)
-
-</details>
-
-<details>
-<summary><strong>Откат на stock EventMsg</strong></summary>
-
-```
-C:\Users\Public\UPSMON-Pro\backup\EventMsg.exe
-→ C:\Program Files (x86)\UPSMONPRO\EventMsg.exe
-```
-
-</details>
+4. **Увидели старое окно с OK?**  
+   Значит, стоит ещё оригинальный файл — повторите копирование в папку UPSMONPRO.
 
 ---
 
-## Dev-сборка
+## Как вернуть всё как было
 
-| Ключ (`EventMsg-Dev.exe`) | Действие |
-|---------------------------|----------|
-| `--test-toast` | Пробный toast |
-| `--test-toast-replace` | Проверка замены |
-| `--spy` | Лог Win32 без toast |
-| `--help` | Справка |
+Скопируйте сохранённый оригинал обратно:
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\build.ps1
-powershell -ExecutionPolicy Bypass -File .\package-release.ps1
-```
+`…\backup\EventMsg.exe` → `C:\Program Files (x86)\UPSMONPRO\EventMsg.exe`
 
-Сборка: `EventMsg.exe` + `EventMsg-Dev.exe` (x86). CI публикует оба при push тега `v*`.
+Перезапустите UPSMON — снова будут обычные окна с OK.
 
 ---
 
-## Структура проекта
+## Частые вопросы
 
-```
-event-msg/
-├── docs/
-│   └── toast-example.png    # пример уведомления
-├── src/
-│   ├── Program.cs           # prod / dev entry
-│   ├── EventMessageHost.cs  # протокол UPSMON
-│   ├── EventRecordReader.cs # EventRecord.CSV
-│   ├── StockForwarder.cs    # второй запуск UPSMON
-│   └── ToastNotifier.cs     # WinRT toast
-├── tools/                   # диагностика
-├── build.ps1
-└── package-release.ps1
-```
+**Нужно ли запускать программу вручную?**  
+Нет. UPSMON сам вызывает её при каждом событии.
 
----
+**Нужно ли держать её в фоне?**  
+Нет. Показала уведомление — и закрылась.
 
-## Связанные проекты
+**Работает ли с моим ИБП?**  
+Если у вас установлен UPSMON Pro и штатные окна EventMsg раньше появлялись — да, подойдёт.
 
-Часть форка [UPSMIONPRO](https://github.com/fmu1337/upsmonpro_fork) — нативный мониторинг PowerCom RPT-2000AP, Display, upsbatt.
+**Что за второй файл EventMsg-Dev?**  
+Только для проверки и отладки. В папку UPSMON его ставить не нужно.
 
 ---
 
 <p align="center">
-  MIT License · <a href="CHANGELOG.md">Changelog</a>
+  <a href="https://github.com/fmu1337/upsmon-toast-notify/releases/latest">Скачать последнюю версию</a>
+  ·
+  <a href="CHANGELOG.md">Что изменилось</a>
+  ·
+  MIT
 </p>
