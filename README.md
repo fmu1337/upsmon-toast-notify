@@ -4,7 +4,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/fmu1337/upsmon-toast-notify/releases/tag/v3.2.0">Release v3.2.0</a> ·
+  <a href="https://github.com/fmu1337/upsmon-toast-notify/releases/tag/v3.2.1">Release v3.2.1</a> ·
   <a href="CHANGELOG.md">Changelog</a> ·
   <a href="LICENSE">MIT License</a>
 </p>
