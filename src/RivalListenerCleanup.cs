@@ -8,6 +8,7 @@ namespace UpsmonEventMsg
     /// <summary>
     /// Old v1/v2 installs left a PowerShell listener with the same window class.
     /// UPSMON uses FindWindow(class, title) and sends WM_COPYDATA to the first match.
+    /// Only kill non-EventMsg owners — never our own toast process.
     /// </summary>
     internal static class RivalListenerCleanup
     {
@@ -53,34 +54,47 @@ namespace UpsmonEventMsg
                 GetWindowThreadProcessId(hWnd, out ownerPid);
                 if (ownerPid == 0 || ownerPid == selfPid) return true;
 
+                if (IsOurEventMsg(ownerPid)) return true;
+
+                string ownerName = SafeProcessName(ownerPid);
                 if (TryTerminateProcess(ownerPid))
                 {
                     removed++;
-                    EventLogger.Log("Removed legacy listener pid=" + ownerPid + " hwnd=0x"
-                        + hWnd.ToInt64().ToString("X"));
+                    EventLogger.Log("Removed rival listener pid=" + ownerPid
+                        + " name=" + ownerName
+                        + " hwnd=0x" + hWnd.ToInt64().ToString("X"));
                 }
                 else
                 {
-                    EventLogger.Log("WARNING: legacy listener pid=" + ownerPid
+                    EventLogger.Log("WARNING: rival listener pid=" + ownerPid
+                        + " name=" + ownerName
                         + " hwnd=0x" + hWnd.ToInt64().ToString("X")
-                        + " blocks UPSMON messages. Run tools\\Remove-LegacyListener.ps1 as Administrator.");
+                        + " blocks UPSMON. Run tools\\Remove-LegacyListener.ps1 as Administrator.");
                 }
                 return true;
             }, IntPtr.Zero);
 
             if (removed > 0)
-                System.Threading.Thread.Sleep(500);
+                System.Threading.Thread.Sleep(400);
+        }
 
-            IntPtr found = FindWindow(TargetClass, TargetTitle);
-            if (found != IntPtr.Zero)
+        public static bool IsOurEventMsg(uint pid)
+        {
+            string name = SafeProcessName(pid);
+            return name.Equals("EventMsg", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("EventMsg-Dev", StringComparison.OrdinalIgnoreCase);
+        }
+
+        static string SafeProcessName(uint pid)
+        {
+            try
             {
-                uint foundPid;
-                GetWindowThreadProcessId(found, out foundPid);
-                if (foundPid != selfPid && foundPid != 0)
-                {
-                    EventLogger.Log("WARNING: FindWindow still points to foreign pid=" + foundPid
-                        + ". UPSMON events will not reach this EventMsg until it is removed.");
-                }
+                using (var p = Process.GetProcessById((int)pid))
+                    return p.ProcessName ?? string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
             }
         }
 

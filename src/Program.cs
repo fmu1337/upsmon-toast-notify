@@ -5,7 +5,7 @@ namespace UpsmonEventMsg
 {
     internal static class Program
     {
-        const string SingleInstanceMutex = "Global\\UpsmonEventMsg_v320";
+        const string SingleInstanceMutex = "Global\\UpsmonEventMsg_v321";
 
         static int Main(string[] args)
         {
@@ -21,9 +21,19 @@ namespace UpsmonEventMsg
             if (HasDevFlag(args))
                 return 0;
 
-            if (!StockForwarder.TryForwardToRunningInstance())
-                RunHost(spy: false);
+            // Kill PowerShell / legacy windows first — they steal FindWindow from UPSMON.
+            RivalListenerCleanup.RemoveRivalListeners();
 
+            // Always toast ourselves from EventRecord when possible.
+            // (June/July outages: we forwarded to a foreign hwnd and exited with no toast.)
+            if (TryToastFromEventRecord())
+                return 0;
+
+            // Another EventMsg may already be waiting — forward only to EventMsg.exe.
+            if (StockForwarder.TryForwardToRunningInstance())
+                return 0;
+
+            RunHost(spy: false);
             return 0;
         }
 
@@ -57,11 +67,35 @@ namespace UpsmonEventMsg
                 return 0;
             }
 
+            RivalListenerCleanup.RemoveRivalListeners();
+
+            if (!spy && TryToastFromEventRecord())
+                return 0;
+
             if (!spy && StockForwarder.TryForwardToRunningInstance())
                 return 0;
 
             RunHost(spy);
             return 0;
+        }
+
+        /// <summary>
+        /// UPSMON writes EventRecord then WinExecs us — poll briefly so we don't miss the line.
+        /// </summary>
+        static bool TryToastFromEventRecord()
+        {
+            for (int i = 0; i < 15; i++)
+            {
+                string text = EventRecordReader.ReadPendingMessage();
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    EventLogger.Log("Event: " + text);
+                    ToastNotifier.Show("UPSMON Pro", text, waitForDisplay: true);
+                    return true;
+                }
+                Thread.Sleep(80);
+            }
+            return false;
         }
 
         static void RunHost(bool spy)
@@ -71,7 +105,8 @@ namespace UpsmonEventMsg
             {
                 if (!created)
                 {
-                    StockForwarder.TryForwardToRunningInstance();
+                    if (!TryToastFromEventRecord())
+                        StockForwarder.TryForwardToRunningInstance();
                     return;
                 }
 

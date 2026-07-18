@@ -5,7 +5,9 @@ using System.Text;
 
 namespace UpsmonEventMsg
 {
-    /// <summary>Second instance: like stock FindWindow + SendMessage, then exit.</summary>
+    /// <summary>
+    /// Forward only to a live EventMsg.exe. Never hand events to PowerShell / strangers.
+    /// </summary>
     internal static class StockForwarder
     {
         const string ClassName = "TnUPSMONProEventMesg";
@@ -20,12 +22,29 @@ namespace UpsmonEventMsg
             NativeMethods.GetWindowThreadProcessId(hwnd, out ownerPid);
             if (ownerPid == 0 || ownerPid == (uint)Process.GetCurrentProcess().Id) return false;
 
+            if (!RivalListenerCleanup.IsOurEventMsg(ownerPid))
+            {
+                EventLogger.Log("Skip forward: foreign window pid=" + ownerPid
+                    + " name=" + SafeName(ownerPid) + " (will toast ourselves)");
+                return false;
+            }
+
             string text = EventRecordReader.ReadPendingMessage();
             if (string.IsNullOrWhiteSpace(text)) return false;
 
             SendText(hwnd, text);
-            EventLogger.Log("Forwarded to running EventMsg: " + text);
+            EventLogger.Log("Forwarded to EventMsg pid=" + ownerPid + ": " + text);
             return true;
+        }
+
+        static string SafeName(uint pid)
+        {
+            try
+            {
+                using (var p = Process.GetProcessById((int)pid))
+                    return p.ProcessName;
+            }
+            catch { return "?"; }
         }
 
         static void SendText(IntPtr hwnd, string text)

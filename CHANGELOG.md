@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.2.1
+
+- **Fix:** toast мог не появиться, если `FindWindow` находил чужое окно (PowerShell / legacy) — forward уходил туда, а свой toast не показывался.
+- Сначала свой toast из `EventRecord.CSV`; forward только к живому `EventMsg.exe`.
+- Rival cleanup убивает только чужие процессы, не другой EventMsg.
+
 ## v3.2.0
 
 - Два бинарника в релизе: **`EventMsg.exe`** (production) и **`EventMsg-Dev.exe`** (тесты и `--spy`).

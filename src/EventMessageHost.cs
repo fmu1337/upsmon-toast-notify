@@ -25,6 +25,7 @@ namespace UpsmonEventMsg
         IntPtr _hwnd = IntPtr.Zero;
         bool _running;
         bool _closed;
+        string _lastToast;
 
         public EventMessageHost(bool spy)
         {
@@ -148,8 +149,13 @@ namespace UpsmonEventMsg
 
         void ShowToastAndExit(string body)
         {
-            if (_closed) return;
+            // Same text again while exiting — ignore. Different text (e.g. Failure→Restore
+            // forwarded while we still sleep) — show and replace.
+            if (_closed && string.Equals(body, _lastToast, StringComparison.OrdinalIgnoreCase))
+                return;
+
             _closed = true;
+            _lastToast = body;
 
             if (_hwnd != IntPtr.Zero)
                 NativeMethods.KillTimer(_hwnd, new IntPtr(Timer1));
